@@ -1,5 +1,6 @@
 import 'package:chat_app/model/api_key_model.dart';
 import 'package:chat_gpt_sdk/chat_gpt_sdk.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dash_chat_2/dash_chat_2.dart';
 import 'package:flutter/material.dart';
 
@@ -11,6 +12,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final _openAI = OpenAI.instance.build(
     token: OPEN_API_KEY,
     baseOption: HttpSetup(
@@ -87,5 +89,22 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _typingUsers.remove(_gptChatUser);
     });
+    saveMessageToFirestore(m);
+  }
+
+  Stream<QuerySnapshot> getMessages() {
+    return _firestore.collection('messages').orderBy('createdAt').snapshots();
+  }
+
+  Future<void> saveMessageToFirestore(ChatMessage m) async {
+    try {
+      await _firestore.collection('messages').add({
+        'user': _currentUser.id,
+        'createdAt': DateTime.now(),
+        'text': m.text,
+      });
+    } catch (e) {
+      print('Error saving message to Firestore: $e');
+    }
   }
 }
