@@ -2,7 +2,9 @@ import 'package:chat_app/model/api_key_model.dart';
 import 'package:chat_gpt_sdk/chat_gpt_sdk.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dash_chat_2/dash_chat_2.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -12,6 +14,40 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  var meessageString = '';
+
+  void getMyDeviceToken() async {
+    final token = await FirebaseMessaging.instance.getToken();
+    print('token: $token');
+  }
+
+  @override
+  void initState() {
+    getMyDeviceToken();
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+      RemoteNotification? notification = message.notification;
+      if (notification != null) {
+        FlutterLocalNotificationsPlugin().show(
+          notification.hashCode,
+          notification.title,
+          notification.body,
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              "high_importance_channel",
+              "high_importance_notification",
+              importance: Importance.max,
+            ),
+          ),
+        );
+        setState(() {
+          meessageString = notification.body!;
+          print('meessageString: $meessageString');
+        });
+      }
+    });
+    super.initState();
+  }
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final _openAI = OpenAI.instance.build(
     token: OPEN_API_KEY,
@@ -34,22 +70,26 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.green[600],
-        title: const Text("GPT Chat"),
-      ),
-      body: DashChat(
-          currentUser: _currentUser,
-          typingUsers: _typingUsers,
-          messageOptions: const MessageOptions(
-              currentUserContainerColor: Colors.black,
-              containerColor: Colors.blue,
-              textColor: Colors.white),
-          onSend: (ChatMessage m) {
-            getChatResponse(m);
-          },
-          messages: _messages),
-    );
+        appBar: AppBar(
+          backgroundColor: Colors.green[600],
+          title: const Text("GPT Chat"),
+        ),
+        body: Column(
+          children: [
+            Text("message: $meessageString"),
+            DashChat(
+                currentUser: _currentUser,
+                typingUsers: _typingUsers,
+                messageOptions: const MessageOptions(
+                    currentUserContainerColor: Colors.black,
+                    containerColor: Colors.blue,
+                    textColor: Colors.white),
+                onSend: (ChatMessage m) {
+                  getChatResponse(m);
+                },
+                messages: _messages),
+          ],
+        ));
   }
 
   Future<void> getChatResponse(ChatMessage m) async {
